@@ -1,0 +1,1 @@
+// Build a coinbase transaction that spends to the miner's address
