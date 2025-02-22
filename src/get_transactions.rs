@@ -1,16 +1,8 @@
-// get transactions from the mempool using the RPC interface
-// Use RPC interface?
-
-// use
-// bitcoin-cli getblocktemplate '{"rules": ["segwit"]}
-// for now
-
 use bitcoincore_rpc::json::GetBlockTemplateResult;
 use bitcoincore_rpc::{Client, RpcApi};
 use bitcoincore_rpc::bitcoincore_rpc_json::{
     GetBlockTemplateModes,
-    GetBlockTemplateRules,
-    GetBlockTemplateCapabilities
+    GetBlockTemplateRules
 };
 
 pub fn get_mempool_transactions(client: &Client) -> Vec<String> {
@@ -24,12 +16,9 @@ pub fn get_block_template(client: &Client) -> GetBlockTemplateResult {
     let rules = vec![GetBlockTemplateRules::SegWit];
     let capabilities = vec![];
     
-    let template = client.get_block_template(
+    client.get_block_template(
         mode,
         &rules,
         &capabilities
-    ).expect("Failed to get block template");
-    
-    // Process template data here
-    template
+    ).expect("Failed to get block template")
 }
