@@ -10,12 +10,14 @@ pub fn create_coinbase_transaction(
     reward: u64,
     miner_address: &str,
 ) -> Transaction {
-    // Create a coinbase input
+    let coinbase_script = Script::builder()
+    .push_int(height as i64)  // BIP-34: Block height in scriptsig
+    .push_slice(b"OxyHash")   // Add mining pool identifier
+    .into_script();
+
     let coinbase_input = TxIn {
         previous_output: OutPoint::null(),
-        script_sig: Script::builder()
-            .push_int(height as i64)  // BIP-34: Block height in scriptsig
-            .into_script(),
+        script_sig: coinbase_script,
         sequence: bitcoin::Sequence(0xffffffff),
         witness: Default::default(),
     };

@@ -5,6 +5,7 @@ use bitcoincore_rpc::bitcoincore_rpc_json::{
     GetBlockTemplateRules
 };
 
+// Remove this
 pub fn get_mempool_transactions(client: &Client) -> Vec<String> {
     // Get raw mempool
     let txids = client.get_raw_mempool().expect("Failed to get mempool");
