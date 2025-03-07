@@ -3,6 +3,7 @@ use std::io::{BufRead, BufReader};
 use std::thread;
 use std::time::Duration;
 use bitcoin::Block;
+use bitcoin::block::Header;
 use bitcoin::consensus::serialize;
 use std::env;
 
@@ -11,12 +12,13 @@ const NUM_WORKERS: u32 = 1;
 const NONCE_RANGE: u32 = u32::MAX / NUM_WORKERS;
 
 // Remove the first argument
-fn start_worker(_worker_id: u32, start_nonce: u32, end_nonce: u32, block_data: &[u8]) -> Child {
+fn start_worker(_worker_id: u32, start_nonce: u32, end_nonce: u32, block_data: &[u8], header: Header) -> Child {
     Command::new(env::current_exe().unwrap()) // Use the current binary
         .arg("worker")
         .arg(start_nonce.to_string())
         .arg(end_nonce.to_string())
         .arg(hex::encode(block_data))
+        .arg(hex::encode(serialize(&header)))
         .stdout(Stdio::piped()) // Capture output
         .spawn()
         .expect("Failed to start worker")
@@ -24,12 +26,13 @@ fn start_worker(_worker_id: u32, start_nonce: u32, end_nonce: u32, block_data: &
 
 pub fn mine_main(block: Block) {
     let serialized_block = serialize(&block); // Serialize block for workers
+    let header = block.header;
     let mut workers: Vec<(Child, u32, u32, u32)> = vec![];
 
     for i in 0..NUM_WORKERS {
         let start = i * NONCE_RANGE;
         let end = start + NONCE_RANGE - 1;
-        let worker = start_worker(i, start, end, &serialized_block);
+        let worker = start_worker(i, start, end, &serialized_block, header);
         println!("Started worker {}: mining range {}-{}", i, start, end);
         workers.push((worker, i, start, end));
     }

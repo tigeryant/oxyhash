@@ -6,6 +6,7 @@ pub mod build_coinbase;
 pub mod mine;
 pub mod mining;
 pub mod broadcast;
+pub mod cli;
 
 use std::env;
 
@@ -15,20 +16,14 @@ use get_transactions::get_mempool_transactions;
 use construct_block::construct_block;
 use mining::{main_proc::mine_main, worker_proc::mine_worker};
 use broadcast::broadcast_block;
-use bitcoin::Block;
+use cli::{Commands, Cli};
+use clap::Parser;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    // let valid_block = String::new();
-    
     if args.get(1).map(|s| s.as_str()) == Some("worker") {
-        let (block_hex, _nonce, _hash) = mine_worker().unwrap();
-
-        let block_bytes = hex::decode(&block_hex).expect("Failed to decode block hex");
-
-        let block: Block = bitcoin::consensus::deserialize(&block_bytes)
-            .expect("Failed to deserialize block");
+        let block = mine_worker().unwrap();
 
         // broadcast the block
         let rpc_client = connect_to_bitcoin_node();
@@ -44,6 +39,29 @@ fn main() {
         }
     }
 
+    // CLI
+    let cli = Cli::parse();
+
+    if cli.debug {
+        println!("Debug mode enabled");
+    }
+
+    if let Some(input) = cli.input {
+        println!("Input file: {}", input);
+    }
+
+    let miner_address: String = match cli.command {
+        Some(Commands::Address { address }) => {
+            // define the address
+            println!("address defined");
+            address
+        }
+        None => {
+            println!("Default - using hardcoded miner address");
+            String::from("bc1qq0hyc6ftal99hks3uspapyl8vcscqjf4aad7sp")
+        },
+    };
+
     let client = connect_to_bitcoin_node();
 
     // Can remove this
@@ -54,10 +72,10 @@ fn main() {
     // dbg!(&template);
 
     // Add the option for the user to define this later
-    let miner_address = "bc1qq0hyc6ftal99hks3uspapyl8vcscqjf4aad7sp";
+    // let miner_address = "bc1qq0hyc6ftal99hks3uspapyl8vcscqjf4aad7sp";
 
-    let candidate_block = construct_block(template, miner_address);
-    // dbg!(candidate_block);
+    let candidate_block = construct_block(template, &miner_address);
+    // dbg!(&candidate_block);
 
     // This function returns the unit type
     mine_main(candidate_block);
