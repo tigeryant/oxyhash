@@ -1,2 +1,2 @@
-pub mod main_proc;
-pub mod worker_proc;
+pub mod mine_main;
+pub mod mine_worker;

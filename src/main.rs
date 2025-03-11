@@ -1,5 +1,5 @@
 pub mod node_connect;
-pub mod get_transactions;
+pub mod get_block_template;
 pub mod construct_block;
 pub mod calculate_merkle_root;
 pub mod build_coinbase;
@@ -8,37 +8,19 @@ pub mod mining;
 pub mod broadcast;
 pub mod cli;
 
-use std::env;
-
-use get_transactions::get_block_template;
+use get_block_template::get_block_template;
 use node_connect::connect_to_bitcoin_node;
-use get_transactions::get_mempool_transactions;
 use construct_block::construct_block;
-use mining::{main_proc::mine_main, worker_proc::mine_worker};
+use mining::mine_main::mine_main;
 use broadcast::broadcast_block;
 use cli::{Commands, Cli};
 use clap::Parser;
+use blocktalk::BlockTalk;
+use tokio::task::LocalSet;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-
-    if args.get(1).map(|s| s.as_str()) == Some("worker") {
-        let block = mine_worker().unwrap();
-
-        // broadcast the block
-        let rpc_client = connect_to_bitcoin_node();
-        match broadcast_block(block, &rpc_client) {
-            Ok(_) => {
-                eprintln!("Block broadcast");
-                std::process::exit(0);
-            },
-            Err(e) => {
-                eprintln!("Failed to broadcast block: {}", e);
-                std::process::exit(1);
-            }
-        }
-    }
-
+#[tokio::main]
+async fn main() {
+    // Refactor cli into another file
     // CLI
     let cli = Cli::parse();
 
@@ -62,22 +44,35 @@ fn main() {
         },
     };
 
+    // blocktalk init
+    let local = LocalSet::new();
+    local.run_until(async {
+        let blocktalk = BlockTalk::init("/Users/john/Development/bitcoin/bitcoin-node.sock").await.unwrap();
+        let chain = blocktalk.chain();
+        let (height, hash) = chain.get_tip().await.unwrap();
+        // Get current tip
+        println!("Current tip: height={}, hash={}", height, hash);
+    }).await;
+
     let client = connect_to_bitcoin_node();
 
-    // Can remove this
-    let _txs = get_mempool_transactions(&client);
-    // dbg!(&txs);
-
     let template = get_block_template(&client);
-    // dbg!(&template);
-
-    // Add the option for the user to define this later
-    // let miner_address = "bc1qq0hyc6ftal99hks3uspapyl8vcscqjf4aad7sp";
 
     let candidate_block = construct_block(template, &miner_address);
-    // dbg!(&candidate_block);
 
-    // This function returns the unit type
-    mine_main(candidate_block);
-    // dbg!(valid_block);
+    let valid_block = mine_main(candidate_block);
+
+    // Update how we connect to the client (should already have an IPC interface initialized)
+    // Afterwards, start mining the next block
+    let rpc_client = connect_to_bitcoin_node();
+    match broadcast_block(valid_block, &rpc_client) {
+        Ok(_) => {
+            println!("Block broadcast");
+            std::process::exit(0);
+        },
+        Err(e) => {
+            println!("Failed to broadcast block: {}", e);
+            std::process::exit(1);
+        }
+    }
 }
