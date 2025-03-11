@@ -3,58 +3,34 @@ pub mod get_block_template;
 pub mod construct_block;
 pub mod calculate_merkle_root;
 pub mod build_coinbase;
-pub mod mine;
 pub mod mining;
 pub mod broadcast;
 pub mod cli;
 
 use get_block_template::get_block_template;
-use node_connect::connect_to_bitcoin_node;
+use node_connect::node_connect;
 use construct_block::construct_block;
 use mining::mine_main::mine_main;
 use broadcast::broadcast_block;
-use cli::{Commands, Cli};
-use clap::Parser;
 use blocktalk::BlockTalk;
 use tokio::task::LocalSet;
+use cli::cli_args;
 
 #[tokio::main]
 async fn main() {
-    // Refactor cli into another file
-    // CLI
-    let cli = Cli::parse();
-
-    if cli.debug {
-        println!("Debug mode enabled");
-    }
-
-    if let Some(input) = cli.input {
-        println!("Input file: {}", input);
-    }
-
-    let miner_address: String = match cli.command {
-        Some(Commands::Address { address }) => {
-            // define the address
-            println!("address defined");
-            address
-        }
-        None => {
-            println!("Default - using hardcoded miner address");
-            String::from("bc1qq0hyc6ftal99hks3uspapyl8vcscqjf4aad7sp")
-        },
-    };
+    let (miner_address, socket_path) = cli_args();
 
     // blocktalk init
     let local = LocalSet::new();
     local.run_until(async {
-        let blocktalk = BlockTalk::init("/Users/john/Development/bitcoin/bitcoin-node.sock").await.unwrap();
+        let blocktalk = BlockTalk::init(&socket_path).await.unwrap();
         let chain = blocktalk.chain();
         let (height, hash) = chain.get_tip().await.unwrap();
         // Get current tip
         println!("Current tip: height={}, hash={}", height, hash);
     }).await;
 
-    let client = connect_to_bitcoin_node();
+    let client = node_connect();
 
     let template = get_block_template(&client);
 
@@ -64,9 +40,10 @@ async fn main() {
 
     // Update how we connect to the client (should already have an IPC interface initialized)
     // Afterwards, start mining the next block
-    let rpc_client = connect_to_bitcoin_node();
+    let rpc_client = node_connect();
     match broadcast_block(valid_block, &rpc_client) {
         Ok(_) => {
+            // Start mining the new block after the block is broadcast
             println!("Block broadcast");
             std::process::exit(0);
         },

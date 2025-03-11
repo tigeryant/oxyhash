@@ -19,7 +19,7 @@ async fn connect_to_bitcoin_node() -> Result<Arc<Connection>, BlockTalkError> {
 
 // Update to use blocktalk
 
-pub fn connect_to_bitcoin_node() -> Client {
+pub fn node_connect() -> Client {
     dotenv().ok();
 
     let rpc_user = env::var("RPC_USERNAME").expect("RPC_USERNAME must be set");
